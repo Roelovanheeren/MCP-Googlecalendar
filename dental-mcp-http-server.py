@@ -111,10 +111,17 @@ async def mcp_info():
     """GET endpoint that ElevenLabs calls first to validate the server"""
     logger.info("ElevenLabs GET request to /mcp")
     return {
-        "status": "MCP server available",
-        "tools": 6,
-        "protocol": "mcp",
-        "version": "1.0.0"
+        "jsonrpc": "2.0",
+        "result": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "tools": {}
+            },
+            "serverInfo": {
+                "name": "dental-calendar-mcp",
+                "version": "1.0.0"
+            }
+        }
     }
 
 @app.get("/mcp/status")
@@ -145,7 +152,23 @@ async def handle_mcp_request(request: dict):
             }
         }
     
-    if method == "tools/list":
+    if method == "initialize":
+        logger.info("ElevenLabs initialize request")
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "tools": {}
+                },
+                "serverInfo": {
+                    "name": "dental-calendar-mcp",
+                    "version": "1.0.0"
+                }
+            }
+        }
+    elif method == "tools/list":
         logger.info("Returning tools list")
         # Try a simpler format that ElevenLabs might expect
         return {
