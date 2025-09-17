@@ -1,7 +1,7 @@
 import os
 import json
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -70,23 +70,21 @@ async def health_check():
     return "ok"
 
 @app.post("/")
-async def mcp_handler(request):
+async def mcp_handler(request: Request):
     try:
-        if isinstance(request, dict):
-            return await handle_mcp_request(request)
-        else:
-            return {"error": "Invalid request format"}
+        body = await request.json()
+        print(f"Received MCP request at /: {body}")
+        return await handle_mcp_request(body)
     except Exception as e:
         print(f"Error in mcp_handler: {e}")
         return {"error": str(e)}
 
 @app.post("/mcp")
-async def mcp_handler_alt(request):
+async def mcp_handler_alt(request: Request):
     try:
-        if isinstance(request, dict):
-            return await handle_mcp_request(request)
-        else:
-            return {"error": "Invalid request format"}
+        body = await request.json()
+        print(f"Received MCP request at /mcp: {body}")
+        return await handle_mcp_request(body)
     except Exception as e:
         print(f"Error in mcp_handler_alt: {e}")
         return {"error": str(e)}
