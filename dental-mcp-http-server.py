@@ -105,6 +105,15 @@ async def mcp_info():
         "server": "dental-calendar-mcp"
     }
 
+@app.get("/mcp")
+async def mcp_get():
+    """Simple GET endpoint for ElevenLabs to test connection"""
+    return {
+        "status": "ok",
+        "message": "MCP server is running",
+        "tools_available": 6
+    }
+
 async def handle_mcp_request(request: dict):
     logger.info(f"Received MCP request: {request}")
     
@@ -125,6 +134,7 @@ async def handle_mcp_request(request: dict):
         }
     
     if method == "tools/list":
+        logger.info("Returning tools list")
         return {
             "jsonrpc": "2.0",
             "id": request_id,
