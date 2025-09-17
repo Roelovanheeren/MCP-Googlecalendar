@@ -70,12 +70,26 @@ async def health_check():
     return "ok"
 
 @app.post("/")
-async def mcp_handler(request: dict):
-    return await handle_mcp_request(request)
+async def mcp_handler(request):
+    try:
+        if isinstance(request, dict):
+            return await handle_mcp_request(request)
+        else:
+            return {"error": "Invalid request format"}
+    except Exception as e:
+        print(f"Error in mcp_handler: {e}")
+        return {"error": str(e)}
 
 @app.post("/mcp")
-async def mcp_handler_alt(request: dict):
-    return await handle_mcp_request(request)
+async def mcp_handler_alt(request):
+    try:
+        if isinstance(request, dict):
+            return await handle_mcp_request(request)
+        else:
+            return {"error": "Invalid request format"}
+    except Exception as e:
+        print(f"Error in mcp_handler_alt: {e}")
+        return {"error": str(e)}
 
 @app.get("/mcp/info")
 async def mcp_info():
@@ -89,9 +103,23 @@ async def mcp_info():
     }
 
 async def handle_mcp_request(request: dict):
-    method = request.get("method")
-    params = request.get("params", {})
-    request_id = request.get("id")
+    print(f"Received MCP request: {request}")
+    
+    # Handle different request formats
+    if isinstance(request, dict):
+        method = request.get("method")
+        params = request.get("params", {})
+        request_id = request.get("id")
+    else:
+        print(f"Unexpected request type: {type(request)}")
+        return {
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {
+                "code": -32600,
+                "message": "Invalid Request"
+            }
+        }
     
     if method == "tools/list":
         return {
