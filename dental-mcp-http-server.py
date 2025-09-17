@@ -69,7 +69,15 @@ async def root():
 async def health_check():
     return "ok"
 
-@app.get("/mcp")
+@app.post("/")
+async def mcp_handler(request: dict):
+    return await handle_mcp_request(request)
+
+@app.post("/mcp")
+async def mcp_handler_alt(request: dict):
+    return await handle_mcp_request(request)
+
+@app.get("/mcp/info")
 async def mcp_info():
     return {
         "protocol": "mcp",
@@ -79,14 +87,6 @@ async def mcp_info():
         },
         "server": "dental-calendar-mcp"
     }
-
-@app.post("/")
-async def mcp_handler(request: dict):
-    return await handle_mcp_request(request)
-
-@app.post("/mcp")
-async def mcp_handler_alt(request: dict):
-    return await handle_mcp_request(request)
 
 async def handle_mcp_request(request: dict):
     method = request.get("method")
