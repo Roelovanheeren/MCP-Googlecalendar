@@ -60,8 +60,15 @@ async def root():
 async def health_check():
     return "ok"
 
-@app.post("/mcp")
+@app.post("/")
 async def mcp_handler(request: dict):
+    return await handle_mcp_request(request)
+
+@app.post("/mcp")
+async def mcp_handler_alt(request: dict):
+    return await handle_mcp_request(request)
+
+async def handle_mcp_request(request: dict):
     method = request.get("method")
     params = request.get("params", {})
     request_id = request.get("id")
