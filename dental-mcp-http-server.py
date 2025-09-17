@@ -1,8 +1,13 @@
 import os
 import json
 import uvicorn
+import logging
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request as GoogleRequest
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -24,10 +29,10 @@ app.add_middleware(
 # Add logging middleware
 @app.middleware("http")
 async def log_requests(request, call_next):
-    print(f"Request: {request.method} {request.url}")
-    print(f"Headers: {dict(request.headers)}")
+    logger.info(f"Request: {request.method} {request.url}")
+    logger.info(f"Headers: {dict(request.headers)}")
     response = await call_next(request)
-    print(f"Response: {response.status_code}")
+    logger.info(f"Response: {response.status_code}")
     return response
 
 # Global variables
@@ -73,20 +78,20 @@ async def health_check():
 async def mcp_handler(request: Request):
     try:
         body = await request.json()
-        print(f"Received MCP request at /: {body}")
+        logger.info(f"Received MCP request at /: {body}")
         return await handle_mcp_request(body)
     except Exception as e:
-        print(f"Error in mcp_handler: {e}")
+        logger.error(f"Error in mcp_handler: {e}")
         return {"error": str(e)}
 
 @app.post("/mcp")
 async def mcp_handler_alt(request: Request):
     try:
         body = await request.json()
-        print(f"Received MCP request at /mcp: {body}")
+        logger.info(f"Received MCP request at /mcp: {body}")
         return await handle_mcp_request(body)
     except Exception as e:
-        print(f"Error in mcp_handler_alt: {e}")
+        logger.error(f"Error in mcp_handler_alt: {e}")
         return {"error": str(e)}
 
 @app.get("/mcp/info")
@@ -101,7 +106,7 @@ async def mcp_info():
     }
 
 async def handle_mcp_request(request: dict):
-    print(f"Received MCP request: {request}")
+    logger.info(f"Received MCP request: {request}")
     
     # Handle different request formats
     if isinstance(request, dict):
@@ -109,7 +114,7 @@ async def handle_mcp_request(request: dict):
         params = request.get("params", {})
         request_id = request.get("id")
     else:
-        print(f"Unexpected request type: {type(request)}")
+        logger.error(f"Unexpected request type: {type(request)}")
         return {
             "jsonrpc": "2.0",
             "id": None,
