@@ -21,6 +21,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add logging middleware
+@app.middleware("http")
+async def log_requests(request, call_next):
+    print(f"Request: {request.method} {request.url}")
+    print(f"Headers: {dict(request.headers)}")
+    response = await call_next(request)
+    print(f"Response: {response.status_code}")
+    return response
+
 # Global variables
 calendar_service = None
 CLINIC_TIMEZONE = "Europe/Amsterdam"
@@ -59,6 +68,17 @@ async def root():
 @app.get("/health")
 async def health_check():
     return "ok"
+
+@app.get("/mcp")
+async def mcp_info():
+    return {
+        "protocol": "mcp",
+        "version": "1.0.0",
+        "capabilities": {
+            "tools": True
+        },
+        "server": "dental-calendar-mcp"
+    }
 
 @app.post("/")
 async def mcp_handler(request: dict):
