@@ -1,42 +1,18 @@
-# Google Calendar MCP Server - Optimized Dockerfile
-# syntax=docker/dockerfile:1
+FROM python:3.11-slim
 
-FROM node:18-alpine
-
-# Create app user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S -u 1001 -G nodejs nodejs
-
-# Set working directory
 WORKDIR /app
 
-# Copy package files for dependency caching
-COPY package*.json ./
+# Copy requirements first for better caching
+COPY requirements.txt .
 
-# Copy build scripts and source files needed for build
-COPY scripts ./scripts
-COPY src ./src
-COPY tsconfig.json .
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install all dependencies (including dev dependencies for build)
-RUN npm ci --no-audit --no-fund --silent
+# Copy the application
+COPY dental-mcp-http-server.py .
 
-# Build the project
-RUN npm run build
+# Expose port
+EXPOSE 8000
 
-# Remove dev dependencies to reduce image size
-RUN npm prune --production --silent
-
-# Create config directory and set permissions
-RUN mkdir -p /home/nodejs/.config/google-calendar-mcp && \
-    chown -R nodejs:nodejs /home/nodejs/.config && \
-    chown -R nodejs:nodejs /app
-
-# Switch to non-root user
-USER nodejs
-
-# Expose port for HTTP mode (optional)
-EXPOSE 3000
-
-# Default command - run directly to avoid npm output
-CMD ["node", "build/index.js"]
+# Run the application
+CMD ["python", "dental-mcp-http-server.py"]

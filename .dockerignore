@@ -1,2 +1,13 @@
-gcp-oauth.keys.json
-.gcp-saved-tokens.json
+node_modules
+npm-debug.log
+src
+scripts
+package*.json
+tsconfig*.json
+build
+*.js
+*.ts
+*.json
+!requirements.txt
+!dental-mcp-http-server.py
+!railway.json
