@@ -105,8 +105,8 @@ async def mcp_info():
         "server": "dental-calendar-mcp"
     }
 
-@app.get("/mcp")
-async def mcp_get():
+@app.get("/mcp/status")
+async def mcp_status():
     """Simple GET endpoint for ElevenLabs to test connection"""
     return {
         "status": "ok",
