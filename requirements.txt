@@ -1,0 +1,7 @@
+fastapi==0.116.2
+uvicorn[standard]==0.31.0
+google-api-python-client==2.144.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+python-multipart==0.0.12
+pytz==2023.3
