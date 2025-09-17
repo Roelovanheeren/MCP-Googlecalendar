@@ -88,7 +88,8 @@ async def mcp_handler(request: Request):
 async def mcp_handler_alt(request: Request):
     try:
         body = await request.json()
-        logger.info(f"Received MCP request at /mcp: {body}")
+        logger.info(f"ElevenLabs POST request to /mcp: {body}")
+        logger.info(f"Request headers: {dict(request.headers)}")
         return await handle_mcp_request(body)
     except Exception as e:
         logger.error(f"Error in mcp_handler_alt: {e}")
@@ -105,9 +106,20 @@ async def mcp_info():
         "server": "dental-calendar-mcp"
     }
 
+@app.get("/mcp")
+async def mcp_info():
+    """GET endpoint that ElevenLabs calls first to validate the server"""
+    logger.info("ElevenLabs GET request to /mcp")
+    return {
+        "status": "MCP server available",
+        "tools": 6,
+        "protocol": "mcp",
+        "version": "1.0.0"
+    }
+
 @app.get("/mcp/status")
 async def mcp_status():
-    """Simple GET endpoint for ElevenLabs to test connection"""
+    """Additional status endpoint"""
     return {
         "status": "ok",
         "message": "MCP server is running",
@@ -135,6 +147,7 @@ async def handle_mcp_request(request: dict):
     
     if method == "tools/list":
         logger.info("Returning tools list")
+        # Try a simpler format that ElevenLabs might expect
         return {
             "jsonrpc": "2.0",
             "id": request_id,
