@@ -627,9 +627,35 @@ async def check_available_slots(args):
             raise ValueError("Date is required")
         
         logger.info(f"Checking available slots for date: {date_str}")
+        
+        # Try to get service, if not available, create it directly
         service = get_calendar_service()
         if service is None:
-            raise Exception("Google Calendar service not available. Please authenticate first at /auth")
+            # Create service directly
+            try:
+                access_token = os.environ.get("GOOGLE_ACCESS_TOKEN")
+                refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
+                client_id = os.environ.get("GOOGLE_CLIENT_ID")
+                client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+                
+                if access_token and refresh_token and client_id and client_secret:
+                    credentials_data = {
+                        "token": access_token,
+                        "refresh_token": refresh_token,
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "scopes": ["https://www.googleapis.com/auth/calendar"]
+                    }
+                    credentials = Credentials.from_authorized_user_info(credentials_data)
+                    service = build('calendar', 'v3', credentials=credentials)
+                    logger.info("Created calendar service directly")
+                else:
+                    raise Exception("Google Calendar service not available. Please authenticate first at /auth")
+            except Exception as e:
+                logger.error(f"Error creating calendar service directly: {e}")
+                raise Exception("Google Calendar service not available. Please authenticate first at /auth")
+        
         calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
         logger.info(f"Using calendar ID: {calendar_id}")
         
