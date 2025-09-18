@@ -45,18 +45,28 @@ WORKING_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"]
 def get_calendar_service():
     global calendar_service
     if calendar_service is None:
-        # Get OAuth credentials from environment
-        oauth_creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS")
-        if not oauth_creds_json:
-            raise HTTPException(status_code=500, detail="GOOGLE_OAUTH_CREDENTIALS not set")
-        
         try:
-            oauth_creds = json.loads(oauth_creds_json)
-            credentials = Credentials.from_authorized_user_info(oauth_creds.get("installed", {}))
+            # First try to use stored credentials from OAuth flow
+            stored_credentials = os.environ.get("GOOGLE_CREDENTIALS")
+            if stored_credentials:
+                credentials_data = json.loads(stored_credentials)
+                credentials = Credentials.from_authorized_user_info(credentials_data)
+                logger.info("Using stored OAuth credentials")
+            else:
+                # Fallback to environment credentials
+                oauth_creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS")
+                if not oauth_creds_json:
+                    raise Exception("No Google credentials available. Please authenticate first at /auth")
+                
+                oauth_creds = json.loads(oauth_creds_json)
+                credentials = Credentials.from_authorized_user_info(oauth_creds.get("installed", {}))
+                logger.info("Using environment credentials")
             
             # Build the service
             calendar_service = build('calendar', 'v3', credentials=credentials)
+            logger.info("Calendar service initialized successfully")
         except Exception as e:
+            logger.error(f"Failed to initialize calendar service: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to initialize calendar service: {str(e)}")
     
     return calendar_service
@@ -132,6 +142,82 @@ async def mcp_status():
         "message": "MCP server is running",
         "tools_available": 6
     }
+
+@app.get("/auth")
+async def auth_redirect():
+    """Redirect to Google OAuth for authentication"""
+    try:
+        # Initialize the OAuth flow
+        flow = InstalledAppFlow.from_client_config(
+            {
+                "installed": {
+                    "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
+                    "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": ["http://localhost"]
+                }
+            },
+            SCOPES
+        )
+        
+        # Get the authorization URL
+        auth_url, _ = flow.authorization_url(prompt='consent')
+        
+        return {
+            "message": "Please visit this URL to authenticate:",
+            "auth_url": auth_url,
+            "instructions": "After authentication, copy the authorization code and use it with /auth/callback?code=YOUR_CODE"
+        }
+    except Exception as e:
+        logger.error(f"Auth error: {e}")
+        return {"error": str(e)}
+
+@app.get("/auth/callback")
+async def auth_callback(code: str = None):
+    """Handle OAuth callback and store tokens"""
+    if not code:
+        return {"error": "No authorization code provided"}
+    
+    try:
+        # Initialize the OAuth flow
+        flow = InstalledAppFlow.from_client_config(
+            {
+                "installed": {
+                    "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
+                    "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": ["http://localhost"]
+                }
+            },
+            SCOPES
+        )
+        
+        # Exchange the code for tokens
+        flow.fetch_token(code=code)
+        credentials = flow.credentials
+        
+        # Store the credentials (in production, use a secure storage)
+        token_data = {
+            "token": credentials.token,
+            "refresh_token": credentials.refresh_token,
+            "token_uri": credentials.token_uri,
+            "client_id": credentials.client_id,
+            "client_secret": credentials.client_secret,
+            "scopes": credentials.scopes
+        }
+        
+        # Save to environment or file (simplified for demo)
+        os.environ["GOOGLE_CREDENTIALS"] = json.dumps(token_data)
+        
+        return {
+            "message": "Authentication successful!",
+            "status": "authenticated"
+        }
+    except Exception as e:
+        logger.error(f"Callback error: {e}")
+        return {"error": str(e)}
 
 async def handle_mcp_request(request: dict):
     logger.info(f"Received MCP request: {request}")
