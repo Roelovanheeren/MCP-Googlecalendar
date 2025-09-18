@@ -15,6 +15,9 @@ from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 import pytz
 
+# Google Calendar API scopes
+SCOPES = ['https://www.googleapis.com/auth/calendar']
+
 app = FastAPI(title="Dental Calendar MCP Server", version="1.0.0")
 
 # CORS middleware
