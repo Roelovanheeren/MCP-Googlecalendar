@@ -9,3 +9,4 @@ coverage/
 settings.local.json
 CLAUDE.md
 .env
+google_credentials.json

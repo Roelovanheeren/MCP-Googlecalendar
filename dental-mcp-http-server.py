@@ -49,21 +49,29 @@ def get_calendar_service():
     global calendar_service
     if calendar_service is None:
         try:
-            # First try to use stored credentials from OAuth flow
-            stored_credentials = os.environ.get("GOOGLE_CREDENTIALS")
-            if stored_credentials:
-                credentials_data = json.loads(stored_credentials)
+            # First try to load from persistent file
+            credentials_file = "google_credentials.json"
+            if os.path.exists(credentials_file):
+                with open(credentials_file, 'r') as f:
+                    credentials_data = json.load(f)
                 credentials = Credentials.from_authorized_user_info(credentials_data)
-                logger.info("Using stored OAuth credentials")
+                logger.info("Using persistent OAuth credentials from file")
             else:
-                # Fallback to environment credentials
-                oauth_creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS")
-                if not oauth_creds_json:
-                    raise Exception("No Google credentials available. Please authenticate first at /auth")
-                
-                oauth_creds = json.loads(oauth_creds_json)
-                credentials = Credentials.from_authorized_user_info(oauth_creds.get("installed", {}))
-                logger.info("Using environment credentials")
+                # Try environment variable
+                stored_credentials = os.environ.get("GOOGLE_CREDENTIALS")
+                if stored_credentials:
+                    credentials_data = json.loads(stored_credentials)
+                    credentials = Credentials.from_authorized_user_info(credentials_data)
+                    logger.info("Using stored OAuth credentials from environment")
+                else:
+                    # Fallback to environment credentials
+                    oauth_creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS")
+                    if not oauth_creds_json:
+                        raise Exception("No Google credentials available. Please authenticate first at /auth")
+                    
+                    oauth_creds = json.loads(oauth_creds_json)
+                    credentials = Credentials.from_authorized_user_info(oauth_creds.get("installed", {}))
+                    logger.info("Using environment credentials")
             
             # Build the service
             calendar_service = build('calendar', 'v3', credentials=credentials)
@@ -307,7 +315,12 @@ async def auth_callback(code: str = None):
             "scopes": ["https://www.googleapis.com/auth/calendar"]
         }
         
-        # Save to environment
+        # Save to persistent file in the app directory
+        credentials_file = "google_credentials.json"
+        with open(credentials_file, 'w') as f:
+            json.dump(credentials_data, f)
+        
+        # Also save to environment for immediate use
         os.environ["GOOGLE_CREDENTIALS"] = json.dumps(credentials_data)
         
         return {
