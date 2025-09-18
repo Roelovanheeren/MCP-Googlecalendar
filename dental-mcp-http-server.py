@@ -394,6 +394,7 @@ async def handle_mcp_request(request: dict):
                             "properties": {
                                 "patient_name": {"type": "string"},
                                 "patient_email": {"type": "string"},
+                                "patient_phone": {"type": "string"},
                                 "date": {"type": "string"},
                                 "time": {"type": "string"},
                                 "appointment_type": {"type": "string"}
@@ -558,6 +559,7 @@ async def check_available_slots(args):
 async def book_appointment(args):
     patient_name = args.get("patient_name")
     patient_email = args.get("patient_email")
+    patient_phone = args.get("patient_phone")
     date_str = args.get("date")
     time_str = args.get("time")
     appointment_type = args.get("appointment_type")
@@ -578,7 +580,7 @@ async def book_appointment(args):
     
     event = {
         'summary': f'Afspraak - {patient_name}',
-        'description': f'Type: {appointment_type}\nPatiënt: {patient_name}\nEmail: {patient_email}',
+        'description': f'Type: {appointment_type}\nPatiënt: {patient_name}\nEmail: {patient_email}\nTelefoon: {patient_phone or "Niet opgegeven"}',
         'start': {
             'dateTime': start_datetime.isoformat(),
             'timeZone': CLINIC_TIMEZONE,
