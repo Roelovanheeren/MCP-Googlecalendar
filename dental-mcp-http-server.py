@@ -78,7 +78,8 @@ def get_calendar_service():
             logger.info("Calendar service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize calendar service: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to initialize calendar service: {str(e)}")
+            # Don't raise exception here, let individual functions handle it
+            return None
     
     return calendar_service
 
@@ -186,6 +187,24 @@ async def root():
 @app.get("/health")
 async def health_check():
     return "ok"
+
+@app.get("/status")
+async def status():
+    """Detailed status endpoint for debugging"""
+    service = get_calendar_service()
+    has_oauth_creds = bool(os.environ.get("GOOGLE_OAUTH_CREDENTIALS"))
+    has_stored_creds = bool(os.environ.get("GOOGLE_CREDENTIALS"))
+    has_credentials_file = os.path.exists("google_credentials.json")
+    
+    return {
+        "status": "running",
+        "calendar_service_available": service is not None,
+        "has_oauth_credentials": has_oauth_creds,
+        "has_stored_credentials": has_stored_creds,
+        "has_credentials_file": has_credentials_file,
+        "calendar_id": os.environ.get("GOOGLE_CALENDAR_ID", "not_set"),
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.post("/")
 async def mcp_handler(request: Request):
@@ -506,6 +525,8 @@ async def check_available_slots(args):
         
         logger.info(f"Checking available slots for date: {date_str}")
         service = get_calendar_service()
+        if service is None:
+            raise Exception("Google Calendar service not available. Please authenticate first at /auth")
         calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
         logger.info(f"Using calendar ID: {calendar_id}")
         
