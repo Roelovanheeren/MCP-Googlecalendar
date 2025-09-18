@@ -648,6 +648,12 @@ async def check_available_slots(args):
                         "scopes": ["https://www.googleapis.com/auth/calendar"]
                     }
                     credentials = Credentials.from_authorized_user_info(credentials_data)
+                    
+                    # Refresh token if needed
+                    if credentials.expired and credentials.refresh_token:
+                        logger.info("Refreshing expired token")
+                        credentials.refresh(GoogleRequest())
+                    
                     service = build('calendar', 'v3', credentials=credentials)
                     logger.info("Created calendar service directly")
                 else:
