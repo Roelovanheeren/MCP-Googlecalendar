@@ -264,12 +264,25 @@ async def status():
             test_credentials = Credentials.from_authorized_user_info(credentials_data)
             credentials_created = True
             credentials_error = None
+            
+            # Try to build the service
+            try:
+                test_service = build('calendar', 'v3', credentials=test_credentials)
+                service_built = True
+                service_error = None
+            except Exception as e:
+                service_built = False
+                service_error = str(e)
         else:
             credentials_created = False
             credentials_error = "Missing required tokens"
+            service_built = False
+            service_error = "No credentials"
     except Exception as e:
         credentials_created = False
         credentials_error = str(e)
+        service_built = False
+        service_error = str(e)
     
     return {
         "status": "running",
@@ -283,6 +296,8 @@ async def status():
         "has_client_secret": has_client_secret,
         "credentials_created": credentials_created,
         "credentials_error": credentials_error,
+        "service_built": service_built,
+        "service_error": service_error,
         "calendar_id": os.environ.get("GOOGLE_CALENDAR_ID", "not_set"),
         "timestamp": datetime.now().isoformat()
     }
