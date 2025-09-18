@@ -40,7 +40,7 @@ async def log_requests(request, call_next):
 
 # Global variables
 calendar_service = None
-CLINIC_TIMEZONE = "Europe/Amsterdam"
+CLINIC_TIMEZONE = "Europe/Amsterdam"  # Netherlands timezone for dental practice
 BUSINESS_HOURS_START = "09:00"
 BUSINESS_HOURS_END = "17:00"
 WORKING_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"]
@@ -73,6 +73,98 @@ def get_calendar_service():
             raise HTTPException(status_code=500, detail=f"Failed to initialize calendar service: {str(e)}")
     
     return calendar_service
+
+async def find_appointment_by_patient_info(patient_name, appointment_date, patient_phone=None, appointment_time=None):
+    """Find appointment by patient information instead of event ID"""
+    try:
+        service = get_calendar_service()
+        
+        # Convert date to datetime range
+        start_date = datetime.strptime(appointment_date, '%Y-%m-%d')
+        end_date = start_date + timedelta(days=1)
+        
+        # Convert to UTC
+        amsterdam_tz = pytz.timezone('Europe/Amsterdam')
+        start_datetime = amsterdam_tz.localize(start_date).astimezone(pytz.UTC)
+        end_datetime = amsterdam_tz.localize(end_date).astimezone(pytz.UTC)
+        
+        # Search for events
+        events_result = service.events().list(
+            calendarId=CALENDAR_ID,
+            timeMin=start_datetime.isoformat(),
+            timeMax=end_datetime.isoformat(),
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        matches = []
+        
+        for event in events:
+            summary = event.get('summary', '').lower()
+            attendees = event.get('attendees', [])
+            
+            # Check if patient name matches
+            if patient_name.lower() in summary:
+                # If time is specified, check if it matches
+                if appointment_time:
+                    event_start = event.get('start', {}).get('dateTime', '')
+                    if event_start:
+                        event_time = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
+                        amsterdam_time = event_time.astimezone(amsterdam_tz)
+                        event_time_str = amsterdam_time.strftime('%H:%M')
+                        if event_time_str == appointment_time:
+                            matches.append(event)
+                else:
+                    matches.append(event)
+            
+            # Also check attendees
+            for attendee in attendees:
+                attendee_email = attendee.get('email', '').lower()
+                attendee_name = attendee.get('displayName', '').lower()
+                if (patient_name.lower() in attendee_email or 
+                    patient_name.lower() in attendee_name):
+                    if appointment_time:
+                        event_start = event.get('start', {}).get('dateTime', '')
+                        if event_start:
+                            event_time = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
+                            amsterdam_time = event_time.astimezone(amsterdam_tz)
+                            event_time_str = amsterdam_time.strftime('%H:%M')
+                            if event_time_str == appointment_time:
+                                matches.append(event)
+                    else:
+                        matches.append(event)
+        
+        if len(matches) == 1:
+            return matches[0]
+        elif len(matches) > 1:
+            # Return the first match with a flag indicating multiple matches
+            result = matches[0]
+            result['_multiple_matches'] = len(matches)
+            return result
+        else:
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error finding appointment: {e}")
+        return None
+
+def parse_date_flexible(date_str):
+    """Parse date in various formats"""
+    try:
+        # Try different date formats
+        formats = ['%Y-%m-%d', '%d-%m-%Y', '%d/%m/%Y', '%Y/%m/%d']
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt)
+            except ValueError:
+                continue
+        # If none work, try to parse with dateutil
+        from dateutil import parser
+        return parser.parse(date_str)
+    except Exception as e:
+        logger.error(f"Error parsing date {date_str}: {e}")
+        return datetime.now()
 
 @app.get("/")
 async def root():
@@ -321,27 +413,31 @@ async def handle_mcp_request(request: dict):
                     },
                     {
                         "name": "cancel_appointment",
-                        "description": "Cancel an appointment",
+                        "description": "Cancel an appointment using patient information",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "event_id": {"type": "string"},
-                                "reason": {"type": "string"}
+                                "patient_name": {"type": "string", "description": "Name of the patient"},
+                                "appointment_date": {"type": "string", "description": "Date of the appointment (YYYY-MM-DD)"},
+                                "appointment_time": {"type": "string", "description": "Time of the appointment (HH:MM)"},
+                                "reason": {"type": "string", "description": "Reason for cancellation"}
                             },
-                            "required": ["event_id"]
+                            "required": ["patient_name", "appointment_date"]
                         }
                     },
                     {
                         "name": "reschedule_appointment",
-                        "description": "Reschedule an appointment",
+                        "description": "Reschedule an appointment using patient information",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "event_id": {"type": "string"},
-                                "new_date": {"type": "string"},
-                                "new_time": {"type": "string"}
+                                "patient_name": {"type": "string", "description": "Name of the patient"},
+                                "current_date": {"type": "string", "description": "Current appointment date (YYYY-MM-DD)"},
+                                "current_time": {"type": "string", "description": "Current appointment time (HH:MM)"},
+                                "new_date": {"type": "string", "description": "New appointment date (YYYY-MM-DD)"},
+                                "new_time": {"type": "string", "description": "New appointment time (HH:MM)"}
                             },
-                            "required": ["event_id", "new_date", "new_time"]
+                            "required": ["patient_name", "current_date", "new_date", "new_time"]
                         }
                     }
                 ]
@@ -362,9 +458,9 @@ async def handle_mcp_request(request: dict):
             elif tool_name == "get_appointment_details":
                 result = await get_appointment_details(arguments)
             elif tool_name == "cancel_appointment":
-                result = await cancel_appointment(arguments)
+                result = await cancel_appointment_by_patient(arguments)
             elif tool_name == "reschedule_appointment":
-                result = await reschedule_appointment(arguments)
+                result = await reschedule_appointment_by_patient(arguments)
             else:
                 raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}")
             
@@ -622,6 +718,193 @@ async def reschedule_appointment(args):
         "new_start": new_start.isoformat(),
         "new_end": new_end.isoformat()
     }
+
+async def cancel_appointment_by_patient(args):
+    """Cancel appointment using patient information instead of event ID"""
+    try:
+        patient_name = args.get('patient_name')
+        appointment_date = args.get('appointment_date')
+        appointment_time = args.get('appointment_time')
+        reason = args.get('reason', 'Geannuleerd door patiënt')
+        
+        if not patient_name or not appointment_date:
+            return {
+                "success": False,
+                "error": "Patient name and appointment date are required",
+                "message": "Ik heb de patiëntnaam en afspraakdatum nodig om de afspraak te annuleren."
+            }
+        
+        # Find the appointment
+        event = await find_appointment_by_patient_info(
+            patient_name=patient_name,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time
+        )
+        
+        if not event:
+            return {
+                "success": False,
+                "error": "Appointment not found",
+                "message": f"Ik kon geen afspraak vinden voor {patient_name} op {appointment_date}. Kunt u de datum en tijd nog eens controleren?"
+            }
+        
+        # Handle multiple matches
+        if event.get('_multiple_matches', 0) > 1:
+            event_time = datetime.fromisoformat(event['start']['dateTime'].replace('Z', '+00:00'))
+            amsterdam_tz = pytz.timezone('Europe/Amsterdam')
+            local_time = event_time.astimezone(amsterdam_tz)
+            
+            return {
+                "success": False,
+                "multiple_matches": True,
+                "message": f"Ik vond meerdere afspraken voor {patient_name}. Bedoelt u de afspraak op {local_time.strftime('%d %B om %H:%M')} te annuleren?",
+                "found_appointment": {
+                    "date": local_time.strftime('%Y-%m-%d'),
+                    "time": local_time.strftime('%H:%M'),
+                    "summary": event.get('summary', '')
+                }
+            }
+        
+        # Cancel the appointment
+        service = get_calendar_service()
+        calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
+        
+        # Update event with cancellation note
+        event['summary'] = f"[GEANNULEERD] {event.get('summary', '')}"
+        event['description'] = f"{event.get('description', '')}\n\nReden annulering: {reason}"
+        
+        updated_event = service.events().update(
+            calendarId=calendar_id, 
+            eventId=event['id'], 
+            body=event
+        ).execute()
+        
+        return {
+            "success": True,
+            "message": f"Afspraak voor {patient_name} op {appointment_date} is succesvol geannuleerd",
+            "reason": reason,
+            "cancelled_appointment": {
+                "patient": patient_name,
+                "date": appointment_date,
+                "time": appointment_time
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error cancelling appointment: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Er ging iets mis bij het annuleren van de afspraak"
+        }
+
+async def reschedule_appointment_by_patient(args):
+    """Reschedule appointment using patient information instead of event ID"""
+    try:
+        patient_name = args.get('patient_name')
+        current_date = args.get('current_date')
+        current_time = args.get('current_time')
+        new_date = args.get('new_date')
+        new_time = args.get('new_time')
+        
+        if not all([patient_name, current_date, new_date, new_time]):
+            return {
+                "success": False,
+                "error": "Missing required parameters",
+                "message": "Ik heb de patiëntnaam, huidige datum, nieuwe datum en nieuwe tijd nodig om de afspraak te verzetten."
+            }
+        
+        # Find the current appointment
+        event = await find_appointment_by_patient_info(
+            patient_name=patient_name,
+            appointment_date=current_date,
+            appointment_time=current_time
+        )
+        
+        if not event:
+            return {
+                "success": False,
+                "error": "Appointment not found",
+                "message": f"Ik kon geen afspraak vinden voor {patient_name} op {current_date}. Kunt u de huidige datum en tijd nog eens controleren?"
+            }
+        
+        # Handle multiple matches
+        if event.get('_multiple_matches', 0) > 1:
+            event_time = datetime.fromisoformat(event['start']['dateTime'].replace('Z', '+00:00'))
+            amsterdam_tz = pytz.timezone('Europe/Amsterdam')
+            local_time = event_time.astimezone(amsterdam_tz)
+            
+            return {
+                "success": False,
+                "multiple_matches": True,
+                "message": f"Ik vond meerdere afspraken voor {patient_name}. Bedoelt u de afspraak op {local_time.strftime('%d %B om %H:%M')} te verzetten?",
+                "found_appointment": {
+                    "date": local_time.strftime('%Y-%m-%d'),
+                    "time": local_time.strftime('%H:%M'),
+                    "summary": event.get('summary', '')
+                }
+            }
+        
+        # Check availability for new time
+        available_slots = await check_available_slots({"date": new_date})
+        available_data = json.loads(available_slots.get("available_slots", "[]"))
+        
+        # Check if new time is available
+        new_time_available = any(slot["time"] == new_time for slot in available_data)
+        if not new_time_available:
+            return {
+                "success": False,
+                "error": "Time slot not available",
+                "message": f"De tijd {new_time} op {new_date} is niet beschikbaar. Beschikbare tijden: {', '.join([slot['time'] for slot in available_data[:5]])}",
+                "available_slots": available_data
+            }
+        
+        # Update the appointment
+        service = get_calendar_service()
+        calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
+        
+        # Parse new date and time
+        new_datetime = parse_date_flexible(new_date)
+        if ':' in new_time:
+            hour, minute = map(int, new_time.split(':'))
+            new_datetime = new_datetime.replace(hour=hour, minute=minute)
+        
+        # Convert to UTC for Google Calendar
+        amsterdam_tz = pytz.timezone('Europe/Amsterdam')
+        new_datetime_utc = amsterdam_tz.localize(new_datetime).astimezone(pytz.UTC)
+        end_datetime_utc = new_datetime_utc + timedelta(minutes=30)  # 30 min appointment
+        
+        # Update the event
+        updated_event = {
+            'start': {'dateTime': new_datetime_utc.isoformat()},
+            'end': {'dateTime': end_datetime_utc.isoformat()},
+        }
+        
+        result = service.events().patch(
+            calendarId=calendar_id,
+            eventId=event['id'],
+            body=updated_event
+        ).execute()
+        
+        return {
+            "success": True,
+            "message": f"Afspraak voor {patient_name} succesvol verzet naar {new_date} om {new_time}",
+            "rescheduled_appointment": {
+                "patient": patient_name,
+                "old_date": current_date,
+                "old_time": current_time,
+                "new_date": new_date,
+                "new_time": new_time
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error rescheduling appointment: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Er ging iets mis bij het verzetten van de afspraak"
+        }
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
