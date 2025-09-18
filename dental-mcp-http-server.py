@@ -115,8 +115,12 @@ def get_calendar_service():
                 logger.info("Refreshed credentials saved")
             
             # Build the service
-            calendar_service = build('calendar', 'v3', credentials=credentials)
-            logger.info("Calendar service initialized successfully")
+            try:
+                calendar_service = build('calendar', 'v3', credentials=credentials)
+                logger.info("Calendar service initialized successfully")
+            except Exception as e:
+                logger.error(f"Error building calendar service: {e}")
+                raise e
         except Exception as e:
             logger.error(f"Failed to initialize calendar service: {e}")
             # Don't raise exception here, let individual functions handle it
