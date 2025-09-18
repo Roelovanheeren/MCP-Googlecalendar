@@ -63,17 +63,23 @@ def get_calendar_service():
                 client_id = os.environ.get("GOOGLE_CLIENT_ID")
                 client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
                 
+                logger.info(f"Token check - Access token: {bool(access_token)}, Refresh token: {bool(refresh_token)}, Client ID: {bool(client_id)}, Client secret: {bool(client_secret)}")
+                
                 if access_token and refresh_token and client_id and client_secret:
-                    credentials_data = {
-                        "token": access_token,
-                        "refresh_token": refresh_token,
-                        "token_uri": "https://oauth2.googleapis.com/token",
-                        "client_id": client_id,
-                        "client_secret": client_secret,
-                        "scopes": ["https://www.googleapis.com/auth/calendar"]
-                    }
-                    credentials = Credentials.from_authorized_user_info(credentials_data)
-                    logger.info("Using direct access and refresh tokens from environment")
+                    try:
+                        credentials_data = {
+                            "token": access_token,
+                            "refresh_token": refresh_token,
+                            "token_uri": "https://oauth2.googleapis.com/token",
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "scopes": ["https://www.googleapis.com/auth/calendar"]
+                        }
+                        credentials = Credentials.from_authorized_user_info(credentials_data)
+                        logger.info("Using direct access and refresh tokens from environment")
+                    except Exception as e:
+                        logger.error(f"Error creating credentials from tokens: {e}")
+                        raise e
                 else:
                     # Try environment variable
                     stored_credentials = os.environ.get("GOOGLE_CREDENTIALS")
