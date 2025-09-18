@@ -164,11 +164,8 @@ async def auth_redirect():
             SCOPES
         )
         
-        # Get the authorization URL with redirect_uri
-        auth_url, _ = flow.authorization_url(
-            prompt='consent',
-            redirect_uri='http://localhost'
-        )
+        # Get the authorization URL
+        auth_url, _ = flow.authorization_url(prompt='consent')
         
         return {
             "message": "Please visit this URL to authenticate:",
@@ -201,7 +198,7 @@ async def auth_callback(code: str = None):
         )
         
         # Exchange the code for tokens
-        flow.fetch_token(code=code, redirect_uri='http://localhost')
+        flow.fetch_token(code=code)
         credentials = flow.credentials
         
         # Store the credentials (in production, use a secure storage)
