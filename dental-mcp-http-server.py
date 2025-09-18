@@ -57,21 +57,39 @@ def get_calendar_service():
                 credentials = Credentials.from_authorized_user_info(credentials_data)
                 logger.info("Using persistent OAuth credentials from file")
             else:
-                # Try environment variable
-                stored_credentials = os.environ.get("GOOGLE_CREDENTIALS")
-                if stored_credentials:
-                    credentials_data = json.loads(stored_credentials)
+                # Try direct access and refresh tokens from environment
+                access_token = os.environ.get("GOOGLE_ACCESS_TOKEN")
+                refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
+                client_id = os.environ.get("GOOGLE_CLIENT_ID")
+                client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+                
+                if access_token and refresh_token and client_id and client_secret:
+                    credentials_data = {
+                        "token": access_token,
+                        "refresh_token": refresh_token,
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "scopes": ["https://www.googleapis.com/auth/calendar"]
+                    }
                     credentials = Credentials.from_authorized_user_info(credentials_data)
-                    logger.info("Using stored OAuth credentials from environment")
+                    logger.info("Using direct access and refresh tokens from environment")
                 else:
-                    # Fallback to environment credentials
-                    oauth_creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS")
-                    if not oauth_creds_json:
-                        raise Exception("No Google credentials available. Please authenticate first at /auth")
-                    
-                    oauth_creds = json.loads(oauth_creds_json)
-                    credentials = Credentials.from_authorized_user_info(oauth_creds.get("installed", {}))
-                    logger.info("Using environment credentials")
+                    # Try environment variable
+                    stored_credentials = os.environ.get("GOOGLE_CREDENTIALS")
+                    if stored_credentials:
+                        credentials_data = json.loads(stored_credentials)
+                        credentials = Credentials.from_authorized_user_info(credentials_data)
+                        logger.info("Using stored OAuth credentials from environment")
+                    else:
+                        # Fallback to environment credentials
+                        oauth_creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS")
+                        if not oauth_creds_json:
+                            raise Exception("No Google credentials available. Please authenticate first at /auth")
+                        
+                        oauth_creds = json.loads(oauth_creds_json)
+                        credentials = Credentials.from_authorized_user_info(oauth_creds.get("installed", {}))
+                        logger.info("Using environment credentials")
             
             # Refresh credentials if needed
             if credentials and credentials.expired and credentials.refresh_token:
