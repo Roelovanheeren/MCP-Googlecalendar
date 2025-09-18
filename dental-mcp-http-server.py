@@ -150,24 +150,19 @@ async def mcp_status():
 async def auth_redirect():
     """Redirect to Google OAuth for authentication"""
     try:
-        # Initialize the OAuth flow
-        flow = InstalledAppFlow.from_client_config(
-            {
-                "installed": {
-                    "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
-                    "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": []
-                }
-            },
-            SCOPES
-        )
+        client_id = os.environ.get("GOOGLE_CLIENT_ID")
+        if not client_id:
+            return {"error": "GOOGLE_CLIENT_ID not set"}
         
-        # Get the authorization URL with redirect_uri
-        auth_url, _ = flow.authorization_url(
-            prompt='consent',
-            redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+        # Create the authorization URL manually
+        auth_url = (
+            f"https://accounts.google.com/o/oauth2/auth?"
+            f"response_type=code&"
+            f"client_id={client_id}&"
+            f"scope=https://www.googleapis.com/auth/calendar&"
+            f"redirect_uri=urn:ietf:wg:oauth:2.0:oob&"
+            f"prompt=consent&"
+            f"access_type=offline"
         )
         
         return {
@@ -186,40 +181,47 @@ async def auth_callback(code: str = None):
         return {"error": "No authorization code provided"}
     
     try:
-        # Initialize the OAuth flow
-        flow = InstalledAppFlow.from_client_config(
-            {
-                "installed": {
-                    "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
-                    "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": []
-                }
-            },
-            SCOPES
-        )
+        import requests
+        
+        client_id = os.environ.get("GOOGLE_CLIENT_ID")
+        client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+        
+        if not client_id or not client_secret:
+            return {"error": "Google credentials not configured"}
         
         # Exchange the code for tokens
-        flow.fetch_token(code=code, redirect_uri='urn:ietf:wg:oauth:2.0:oob')
-        credentials = flow.credentials
-        
-        # Store the credentials (in production, use a secure storage)
+        token_url = "https://oauth2.googleapis.com/token"
         token_data = {
-            "token": credentials.token,
-            "refresh_token": credentials.refresh_token,
-            "token_uri": credentials.token_uri,
-            "client_id": credentials.client_id,
-            "client_secret": credentials.client_secret,
-            "scopes": credentials.scopes
+            "code": code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+            "grant_type": "authorization_code"
         }
         
-        # Save to environment or file (simplified for demo)
-        os.environ["GOOGLE_CREDENTIALS"] = json.dumps(token_data)
+        response = requests.post(token_url, data=token_data)
+        token_response = response.json()
+        
+        if "error" in token_response:
+            return {"error": f"Token exchange failed: {token_response['error']}"}
+        
+        # Store the credentials
+        credentials_data = {
+            "token": token_response["access_token"],
+            "refresh_token": token_response.get("refresh_token"),
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scopes": ["https://www.googleapis.com/auth/calendar"]
+        }
+        
+        # Save to environment
+        os.environ["GOOGLE_CREDENTIALS"] = json.dumps(credentials_data)
         
         return {
             "message": "Authentication successful!",
-            "status": "authenticated"
+            "status": "authenticated",
+            "expires_in": token_response.get("expires_in")
         }
     except Exception as e:
         logger.error(f"Callback error: {e}")
