@@ -865,11 +865,13 @@ async def reschedule_appointment_by_patient(args):
         # Check if new time is available
         new_time_available = any(slot["time"] == new_time for slot in available_data)
         if not new_time_available:
+            available_times = [slot["time"] for slot in available_data[:5]]
             return {
                 "success": False,
                 "error": "Time slot not available",
-                "message": f"De tijd {new_time} op {new_date} is niet beschikbaar. Beschikbare tijden: {', '.join([slot['time'] for slot in available_data[:5]])}",
-                "available_slots": available_data
+                "message": f"De tijd {new_time} op {new_date} is niet beschikbaar. Beschikbare tijden: {', '.join(available_times)}",
+                "available_slots": available_data,
+                "suggested_times": available_times
             }
         
         # Update the appointment
