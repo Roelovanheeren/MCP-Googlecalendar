@@ -116,6 +116,7 @@ def get_calendar_service():
             
             # Build the service
             try:
+                global calendar_service
                 calendar_service = build('calendar', 'v3', credentials=credentials)
                 logger.info("Calendar service initialized successfully")
             except Exception as e:
