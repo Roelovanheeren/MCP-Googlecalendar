@@ -230,6 +230,10 @@ async def status():
     has_oauth_creds = bool(os.environ.get("GOOGLE_OAUTH_CREDENTIALS"))
     has_stored_creds = bool(os.environ.get("GOOGLE_CREDENTIALS"))
     has_credentials_file = os.path.exists("google_credentials.json")
+    has_access_token = bool(os.environ.get("GOOGLE_ACCESS_TOKEN"))
+    has_refresh_token = bool(os.environ.get("GOOGLE_REFRESH_TOKEN"))
+    has_client_id = bool(os.environ.get("GOOGLE_CLIENT_ID"))
+    has_client_secret = bool(os.environ.get("GOOGLE_CLIENT_SECRET"))
     
     return {
         "status": "running",
@@ -237,6 +241,10 @@ async def status():
         "has_oauth_credentials": has_oauth_creds,
         "has_stored_credentials": has_stored_creds,
         "has_credentials_file": has_credentials_file,
+        "has_access_token": has_access_token,
+        "has_refresh_token": has_refresh_token,
+        "has_client_id": has_client_id,
+        "has_client_secret": has_client_secret,
         "calendar_id": os.environ.get("GOOGLE_CALENDAR_ID", "not_set"),
         "timestamp": datetime.now().isoformat()
     }
