@@ -508,56 +508,56 @@ async def check_available_slots(args):
         service = get_calendar_service()
         calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
         logger.info(f"Using calendar ID: {calendar_id}")
-    
-    # Parse date and create time range
-    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-    amsterdam_tz = pytz.timezone(CLINIC_TIMEZONE)
-    
-    # Business hours
-    start_time = amsterdam_tz.localize(datetime.combine(date_obj, datetime.strptime(BUSINESS_HOURS_START, "%H:%M").time()))
-    end_time = amsterdam_tz.localize(datetime.combine(date_obj, datetime.strptime(BUSINESS_HOURS_END, "%H:%M").time()))
-    
-    # Get existing events
-    events_result = service.events().list(
-        calendarId=calendar_id,
-        timeMin=start_time.isoformat(),
-        timeMax=end_time.isoformat(),
-        singleEvents=True,
-        orderBy='startTime'
-    ).execute()
-    
-    events = events_result.get('items', [])
-    
-    # Generate available slots (30-minute intervals)
-    available_slots = []
-    current_time = start_time
-    
-    while current_time < end_time:
-        slot_end = current_time + timedelta(minutes=30)
         
-        # Check if slot conflicts with existing events
-        conflict = False
-        for event in events:
-            event_start = datetime.fromisoformat(event['start']['dateTime'].replace('Z', '+00:00'))
-            event_end = datetime.fromisoformat(event['end']['dateTime'].replace('Z', '+00:00'))
+        # Parse date and create time range
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        amsterdam_tz = pytz.timezone(CLINIC_TIMEZONE)
+        
+        # Business hours
+        start_time = amsterdam_tz.localize(datetime.combine(date_obj, datetime.strptime(BUSINESS_HOURS_START, "%H:%M").time()))
+        end_time = amsterdam_tz.localize(datetime.combine(date_obj, datetime.strptime(BUSINESS_HOURS_END, "%H:%M").time()))
+        
+        # Get existing events
+        events_result = service.events().list(
+            calendarId=calendar_id,
+            timeMin=start_time.isoformat(),
+            timeMax=end_time.isoformat(),
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        
+        # Generate available slots (30-minute intervals)
+        available_slots = []
+        current_time = start_time
+        
+        while current_time < end_time:
+            slot_end = current_time + timedelta(minutes=30)
             
-            if (current_time < event_end and slot_end > event_start):
-                conflict = True
-                break
+            # Check if slot conflicts with existing events
+            conflict = False
+            for event in events:
+                event_start = datetime.fromisoformat(event['start']['dateTime'].replace('Z', '+00:00'))
+                event_end = datetime.fromisoformat(event['end']['dateTime'].replace('Z', '+00:00'))
+                
+                if (current_time < event_end and slot_end > event_start):
+                    conflict = True
+                    break
+            
+            if not conflict:
+                available_slots.append({
+                    "time": current_time.strftime("%H:%M"),
+                    "datetime": current_time.isoformat()
+                })
+            
+            current_time += timedelta(minutes=30)
         
-        if not conflict:
-            available_slots.append({
-                "time": current_time.strftime("%H:%M"),
-                "datetime": current_time.isoformat()
-            })
-        
-        current_time += timedelta(minutes=30)
-    
-    return {
-        "date": date_str,
-        "available_slots": available_slots,
-        "business_hours": f"{BUSINESS_HOURS_START} - {BUSINESS_HOURS_END}"
-    }
+        return {
+            "date": date_str,
+            "available_slots": available_slots,
+            "business_hours": f"{BUSINESS_HOURS_START} - {BUSINESS_HOURS_END}"
+        }
     except Exception as e:
         logger.error(f"Error in check_available_slots: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to check available slots: {str(e)}")
