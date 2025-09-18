@@ -499,12 +499,15 @@ async def handle_mcp_request(request: dict):
         raise HTTPException(status_code=400, detail=f"Unknown method: {method}")
 
 async def check_available_slots(args):
-    date_str = args.get("date")
-    if not date_str:
-        raise ValueError("Date is required")
-    
-    service = get_calendar_service()
-    calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
+    try:
+        date_str = args.get("date")
+        if not date_str:
+            raise ValueError("Date is required")
+        
+        logger.info(f"Checking available slots for date: {date_str}")
+        service = get_calendar_service()
+        calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
+        logger.info(f"Using calendar ID: {calendar_id}")
     
     # Parse date and create time range
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
@@ -555,6 +558,9 @@ async def check_available_slots(args):
         "available_slots": available_slots,
         "business_hours": f"{BUSINESS_HOURS_START} - {BUSINESS_HOURS_END}"
     }
+    except Exception as e:
+        logger.error(f"Error in check_available_slots: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to check available slots: {str(e)}")
 
 async def book_appointment(args):
     patient_name = args.get("patient_name")
