@@ -73,6 +73,23 @@ def get_calendar_service():
                     credentials = Credentials.from_authorized_user_info(oauth_creds.get("installed", {}))
                     logger.info("Using environment credentials")
             
+            # Refresh credentials if needed
+            if credentials and credentials.expired and credentials.refresh_token:
+                logger.info("Refreshing expired credentials")
+                credentials.refresh(GoogleRequest())
+                # Save refreshed credentials
+                credentials_data = {
+                    "token": credentials.token,
+                    "refresh_token": credentials.refresh_token,
+                    "token_uri": credentials.token_uri,
+                    "client_id": credentials.client_id,
+                    "client_secret": credentials.client_secret,
+                    "scopes": credentials.scopes
+                }
+                with open(credentials_file, 'w') as f:
+                    json.dump(credentials_data, f)
+                logger.info("Refreshed credentials saved")
+            
             # Build the service
             calendar_service = build('calendar', 'v3', credentials=credentials)
             logger.info("Calendar service initialized successfully")
@@ -287,7 +304,8 @@ async def auth_redirect():
         return {
             "message": "Please visit this URL to authenticate:",
             "auth_url": auth_url,
-            "instructions": "After authentication, copy the authorization code and use it with /auth/callback?code=YOUR_CODE"
+            "instructions": "After authentication, copy the authorization code and use it with /auth/callback?code=YOUR_CODE",
+            "note": "This is a ONE-TIME setup. After authentication, the service will work permanently."
         }
     except Exception as e:
         logger.error(f"Auth error: {e}")
@@ -342,10 +360,15 @@ async def auth_callback(code: str = None):
         # Also save to environment for immediate use
         os.environ["GOOGLE_CREDENTIALS"] = json.dumps(credentials_data)
         
+        # Reset the global service to force reinitialization
+        global calendar_service
+        calendar_service = None
+        
         return {
-            "message": "Authentication successful!",
+            "message": "Authentication successful! The service is now permanently configured.",
             "status": "authenticated",
-            "expires_in": token_response.get("expires_in")
+            "expires_in": token_response.get("expires_in"),
+            "note": "You will not need to authenticate again. The service will automatically refresh tokens when needed."
         }
     except Exception as e:
         logger.error(f"Callback error: {e}")
