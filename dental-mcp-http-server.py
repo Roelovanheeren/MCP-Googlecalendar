@@ -241,6 +241,32 @@ async def status():
     has_client_id = bool(os.environ.get("GOOGLE_CLIENT_ID"))
     has_client_secret = bool(os.environ.get("GOOGLE_CLIENT_SECRET"))
     
+    # Try to create credentials to see what happens
+    try:
+        access_token = os.environ.get("GOOGLE_ACCESS_TOKEN")
+        refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
+        client_id = os.environ.get("GOOGLE_CLIENT_ID")
+        client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+        
+        if access_token and refresh_token and client_id and client_secret:
+            credentials_data = {
+                "token": access_token,
+                "refresh_token": refresh_token,
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "scopes": ["https://www.googleapis.com/auth/calendar"]
+            }
+            test_credentials = Credentials.from_authorized_user_info(credentials_data)
+            credentials_created = True
+            credentials_error = None
+        else:
+            credentials_created = False
+            credentials_error = "Missing required tokens"
+    except Exception as e:
+        credentials_created = False
+        credentials_error = str(e)
+    
     return {
         "status": "running",
         "calendar_service_available": service is not None,
@@ -251,6 +277,8 @@ async def status():
         "has_refresh_token": has_refresh_token,
         "has_client_id": has_client_id,
         "has_client_secret": has_client_secret,
+        "credentials_created": credentials_created,
+        "credentials_error": credentials_error,
         "calendar_id": os.environ.get("GOOGLE_CALENDAR_ID", "not_set"),
         "timestamp": datetime.now().isoformat()
     }
