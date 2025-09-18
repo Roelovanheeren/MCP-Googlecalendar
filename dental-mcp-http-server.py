@@ -160,7 +160,7 @@ async def auth_redirect():
             f"response_type=code&"
             f"client_id={client_id}&"
             f"scope=https://www.googleapis.com/auth/calendar&"
-            f"redirect_uri=urn:ietf:wg:oauth:2.0:oob&"
+            f"redirect_uri=http://localhost:8080/auth/callback&"
             f"prompt=consent&"
             f"access_type=offline"
         )
@@ -195,7 +195,7 @@ async def auth_callback(code: str = None):
             "code": code,
             "client_id": client_id,
             "client_secret": client_secret,
-            "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+            "redirect_uri": "http://localhost:8080/auth/callback",
             "grant_type": "authorization_code"
         }
         
